@@ -20,16 +20,12 @@ const calculateCost = (order) => {
         const quantity = order[product];
         const availableCenters = productAvailability[product];
   
-        // If starting center has the product, get it from there, otherwise pick first available center
         const selectedCenter = availableCenters.includes(startingCenter)
           ? startingCenter
           : availableCenters[0];
   
         pickups[selectedCenter][product] = quantity;
       }
-  
-      // Keep track of visited centers
-      let tripSequence = [];
   
       // STEP 1: Pickup from starting center
       if (Object.keys(pickups[startingCenter]).length > 0) {
@@ -39,14 +35,10 @@ const calculateCost = (order) => {
         );
   
         const distance = centerDistances[startingCenter];
-  
-        // Vehicle starts at startingCenter, picks up items, and goes to L1 to deliver
-        totalCost += distance * weight;
-        tripSequence.push(`${startingCenter} ➝ L1 (${weight}kg)`);
+        totalCost += distance * weight; // start ➝ L1
       }
   
-      // STEP 2: For other centers, vehicle travels from L1 to center (empty),
-      // picks up items, and returns to L1 (loaded)
+      // STEP 2: Other centers
       for (let center of allCenters) {
         if (center === startingCenter) continue;
   
@@ -60,25 +52,19 @@ const calculateCost = (order) => {
   
         const distance = centerDistances[center];
   
-        // L1 ➝ center (empty): no weight, so 0 cost
-        // center ➝ L1 (carrying weight): pay for this
+        // L1 ➝ center (empty) is free
+        // center ➝ L1 (loaded) costs
         totalCost += distance * weight;
-  
-        tripSequence.push(`L1 ➝ ${center} (0kg)`);
-        tripSequence.push(`${center} ➝ L1 (${weight}kg)`);
       }
   
-      // Keep the minimum cost
       if (totalCost < lowestCost) {
         lowestCost = totalCost;
       }
-  
-      // Optional: For debugging
-      // console.log(`Start at ${startingCenter}: ${tripSequence.join(', ')} = Cost: ${totalCost}`);
     }
   
     return lowestCost;
-  };  
+  };
+   
   
 
 app.post('/calculate', (req, res) => {
