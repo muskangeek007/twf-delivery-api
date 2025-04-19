@@ -7,37 +7,66 @@ app.use(bodyParser.json());
 
 
 const calculateCost = (order) => {
-  const vehicleOptions = centers.map(start => {
-    let cost = 0;
-    let carried = {}; // what the vehicle is carrying at any point
-    let remaining = { ...order };
-
-    // Create a list of pickups needed by center
-    const pickups = { C1: {}, C2: {}, C3: {} };
-    for (let item in order) {
-      const centersWithProduct = productAvailability[item];
-      const preferredCenter = centersWithProduct.includes(start)
-        ? start
-        : centersWithProduct[0]; // fallback to any available center
-
-      pickups[preferredCenter][item] = order[item];
+    const allCenters = ['C1', 'C2', 'C3'];
+    const productWeight = 0.5; // Every product weighs 0.5kg
+    let lowestCost = Infinity; // Start with the highest number possible
+  
+    // Try starting the delivery from each center: C1, C2, C3
+    for (let startingCenter of allCenters) {
+      let totalCost = 0;
+  
+      // This keeps track of which center we'll get each product from
+      const pickups = { C1: {}, C2: {}, C3: {} };
+  
+      // Go through each product in the order
+      for (let product in order) {
+        const quantity = order[product];
+        const centersThatHaveIt = productAvailability[product];
+  
+        // If the starting center has it, we'll get it from there
+        const chosenCenter = centersThatHaveIt.includes(startingCenter)
+          ? startingCenter
+          : centersThatHaveIt[0]; // Otherwise, pick the first available center
+  
+        pickups[chosenCenter][product] = quantity;
+      }
+  
+      // STEP 1: Pick up from the starting center (if any products are there)
+      if (Object.keys(pickups[startingCenter]).length > 0) {
+        const items = pickups[startingCenter];
+        const totalWeight = Object.values(items).reduce((sum, qty) => sum + qty * productWeight, 0);
+        const distance = centerDistances[startingCenter];
+  
+        totalCost += distance * totalWeight; // go to L1 to drop them off
+      }
+  
+      // STEP 2: Visit other centers (if needed)
+      for (let center of allCenters) {
+        // Skip the starting center — already handled
+        if (center === startingCenter) continue;
+  
+        const items = pickups[center];
+        if (Object.keys(items).length === 0) continue; // no products to get from this center
+  
+        const totalWeight = Object.values(items).reduce((sum, qty) => sum + qty * productWeight, 0);
+        const distance = centerDistances[center];
+  
+        // Go from L1 to center to pick up items
+        totalCost += distance * totalWeight;
+  
+        // Come back to L1 to deliver them
+        totalCost += distance * totalWeight;
+      }
+  
+      // After checking all paths, keep the lowest cost found
+      if (totalCost < lowestCost) {
+        lowestCost = totalCost;
+      }
     }
-
-    // Route: Start -> pick up own center -> deliver -> go other centers -> deliver
-    for (let center of centers) {
-      const items = pickups[center];
-      const hasItems = Object.keys(items).length > 0;
-      if (!hasItems) continue;
-
-      const weight = Object.values(items).reduce((sum, qty) => sum + qty * 0.5, 0);
-      cost += centerDistances[center] * weight; // from center to L1
-    }
-
-    return cost;
-  });
-
-  return Math.min(...vehicleOptions);
-};
+  
+    return lowestCost;
+  };
+  
 
 app.post('/calculate', (req, res) => {
   const order = req.body;
